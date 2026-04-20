@@ -85,10 +85,13 @@ confident, flip to `DRY_RUN=0`.
 | --- | --- |
 | Pause instantly | `touch PAUSE` in the Repl shell — the loop sleeps until you `rm PAUSE`. |
 | Dry run | Set `DRY_RUN=1` in Secrets; redeploy. Agent drafts but does not act. |
-| Action cap | `MAX_ACTIONS_PER_TICK` (default 12) — enforced in the prompt. |
+| Action cap | `MAX_ACTIONS_PER_TICK` (default 12) — enforced in the prompt; a WARNING is logged if the model exceeds it. |
 | Never-mail-self | `OWNER_EMAILS` — the agent is instructed to never send to these. |
-| Audit trail | Every tick is logged to `audit.log` with tool-use counts + token usage + the model's own summary. |
-| Backoff on failure | One-shot exceptions double the sleep interval (capped at 5m). |
+| Cold-start bound | `FIRST_RUN_LOOKBACK_MINUTES` (default 60) so the first tick doesn't try to triage weeks of backlog. |
+| Dedupe label | `HANDLED_LABEL` (default `agent/handled`) — the agent labels what it touches and excludes that label on the next scan. |
+| Audit trail | Rotating `audit.log` (5MB × 3) with tool-use names + truncated inputs + token usage + the model's own summary. |
+| Backoff on failure | Exceptions double the sleep interval (capped at 5m); resets on the first successful tick. |
+| Stable cadence | The loop subtracts actual tick duration from the sleep so a slow tick doesn't drift the cadence. |
 
 ### Running locally (outside Replit)
 

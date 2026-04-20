@@ -17,6 +17,8 @@ class Policy:
     max_actions_per_tick: int
     owner_emails: tuple[str, ...]
     reply_allowlist: tuple[str, ...]
+    first_run_lookback_minutes: int
+    handled_label: str
 
     @classmethod
     def from_env(cls) -> "Policy":
@@ -30,6 +32,8 @@ class Policy:
             max_actions_per_tick=int(os.environ.get("MAX_ACTIONS_PER_TICK", "12")),
             owner_emails=_csv("OWNER_EMAILS"),
             reply_allowlist=_csv("REPLY_ALLOWLIST"),
+            first_run_lookback_minutes=int(os.environ.get("FIRST_RUN_LOOKBACK_MINUTES", "60")),
+            handled_label=os.environ.get("HANDLED_LABEL", "agent/handled"),
         )
 
     def paused(self) -> bool:
