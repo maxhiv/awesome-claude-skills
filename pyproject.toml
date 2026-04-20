@@ -1,0 +1,10 @@
+[project]
+name = "claude-agents-sdk-composio"
+version = "0.1.0"
+description = "Claude Agents SDK + Composio starter"
+requires-python = ">=3.10"
+dependencies = [
+    "claude-agent-sdk",
+    "composio",
+    "composio-claude-agent-sdk",
+]

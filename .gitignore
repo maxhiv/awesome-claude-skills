@@ -2,3 +2,11 @@
 # Obviously~
 .claude/
 CLAUDE.md
+
+# Python / uv
+.env
+.venv/
+__pycache__/
+*.pyc
+uv.lock
+.python-version
