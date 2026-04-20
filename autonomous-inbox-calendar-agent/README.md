@@ -47,9 +47,39 @@ on Rube's side. That's the whole point of the MCP connector.
 
 1. Go to <https://rube.app> and sign in.
 2. Connect **Gmail**, **Google Calendar**, **Outlook / Microsoft 365**, and
-   **Slack** (OAuth flows for each).
+   **Slack** (OAuth flows for each). Optional but high-leverage extras —
+   connect these too and the agent will use them when relevant: **Calendly**
+   (scheduling links), **Zoom** / **Google Meet** (auto-create join links),
+   **Notion** (drop meeting notes), **Linear** (ticket refs from mail/Slack).
 3. Copy your MCP server URL and bearer token from the Rube dashboard. They
    look like `https://rube.app/mcp` and a long opaque string.
+
+#### Scoping Rube to just the apps you want (recommended)
+
+By default the Rube MCP URL can reach any toolkit you've connected. For
+defense-in-depth — so a prompt-injection email can't trick the agent into
+using GitHub or Stripe — create a **Custom MCP Server** scoped to just mail,
+calendar, and chat:
+
+```bash
+curl -X POST https://backend.composio.dev/api/v3/mcp/servers/custom \
+  -H "Authorization: Bearer $COMPOSIO_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "inbox-calendar-agent",
+    "toolkits": ["GMAIL", "GOOGLECALENDAR", "OUTLOOK", "SLACK"]
+  }'
+```
+
+Use the returned URL as `RUBE_MCP_URL`. See
+<https://docs.composio.dev/reference/api-reference/mcp/postMcpServersCustom>.
+
+#### Multi-account (e.g. 2 Gmails)
+
+Rube binds tools to the most recently connected account of each type. If
+you have multiple Gmail accounts, the clean pattern is one Custom MCP URL
+per account (created with distinct `user_id` / `auth_config_id`), then run
+one instance of this agent per URL.
 
 ### 2. Get an Anthropic API key
 
@@ -118,23 +148,44 @@ python main.py
 
 ## Tuning
 
+- **Cost — prompt caching is on.** The system prompt is split into a static
+  cacheable block and a dynamic block, so after the first tick in a 5-minute
+  window subsequent ticks read the cached prefix at 10% of base token cost.
+  Watch `cache_read` / `cache_write` in `audit.log`. Caching only activates
+  once the cached prefix (system + Rube's MCP tool defs) crosses 2,048
+  tokens; with a scoped Rube URL that typically happens immediately.
 - **Latency vs cost** — `POLL_INTERVAL_SECONDS=60` ≈ 1,440 ticks/day. If
   you're on Sonnet 4.6 with modest inboxes that's typically a few USD/day.
-  Raise the interval or move to webhook-driven triggers (Rube supports
-  them) to drop cost.
-- **Smarter triage** — swap `ANTHROPIC_MODEL=claude-opus-4-7` for harder
-  scheduling negotiations. Cost goes up roughly 5×.
+  Raise the interval to drop cost proportionally.
+- **Smarter scheduling** — set `THINKING_BUDGET_TOKENS=8000` to enable
+  extended thinking. Worth it if the agent is regularly negotiating meetings
+  across 3+ people's calendars. Keep the value stable (changes invalidate
+  the prompt cache).
+- **Bigger model per tick** — swap `ANTHROPIC_MODEL=claude-opus-4-7`. Cost
+  goes up ~5×; usually not needed.
 - **Narrower scope** — edit `prompts.py`. The whole behavior lives there.
 
 ---
+
+## Auth expiry
+
+Composio auto-refreshes OAuth tokens. When a refresh finally fails (revoked
+consent, password reset, MFA change) the agent sees a `401` /
+`CONNECTION_EXPIRED` from Rube. The loop detects this, logs `AUTH_EXPIRED`
+at ERROR level naming the toolkit, and the model's end-of-tick summary
+includes an `AUTH_EXPIRED: <toolkit>` line. Re-authenticate on
+<https://rube.app> and the next tick resumes automatically.
 
 ## Known limits
 
 - Rube tool availability depends on what Composio exposes for each app at
   the time you run this. If a tool you expect isn't there, check the Rube
   dashboard's tool list.
-- The agent's "memory" is just the last tick's summary. For longer memory,
-  swap `state.py` for a vector store or append-only log fed back into the
-  prompt.
+- Memory is the last 3 tick summaries + mail's `HANDLED_LABEL`. That's
+  enough for continuity across short gaps but not a long-term knowledge
+  base. For "what did I tell Acme about pricing last March?" you'd want a
+  vector index over sent mail — out of scope here.
+- Claude's built-in Memory tool is not used: it requires the Managed Agents
+  API, while this project uses the Messages API for the polling loop.
 - No test suite. This is a small operational script — verify behavior in
   `DRY_RUN=1` first, not with unit tests.

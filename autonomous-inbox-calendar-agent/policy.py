@@ -19,6 +19,7 @@ class Policy:
     reply_allowlist: tuple[str, ...]
     first_run_lookback_minutes: int
     handled_label: str
+    thinking_budget_tokens: int
 
     @classmethod
     def from_env(cls) -> "Policy":
@@ -34,6 +35,7 @@ class Policy:
             reply_allowlist=_csv("REPLY_ALLOWLIST"),
             first_run_lookback_minutes=int(os.environ.get("FIRST_RUN_LOOKBACK_MINUTES", "60")),
             handled_label=os.environ.get("HANDLED_LABEL", "agent/handled"),
+            thinking_budget_tokens=int(os.environ.get("THINKING_BUDGET_TOKENS", "0")),
         )
 
     def paused(self) -> bool:
